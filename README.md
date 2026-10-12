@@ -2,12 +2,12 @@
 
 SAP를 SSoT로 사용하는 개인화 조회 앱의 공통 upstream입니다. 공통 HTTP·인증·MCP 연결과 UI 유틸리티, 최소 실행 가능한 빈 업무 모듈을 제공합니다.
 
-변경 전달은 **core repository → 고객사 fork(Template 지정) → 실무자 앱(Use this template)**을 따릅니다. 고객사는 fork에 인프라와 업무 표준을 적용·검증하고, 실무자는 그 template에서 앱을 생성해 개인화합니다. 고객사가 한 fork 안에서 여러 앱 모듈을 관리하는 기존 방식도 사용할 수 있습니다.
+변경 전달은 **core repository → 공통 Git 이력을 보존한 고객사 private 독립 저장소(Template 지정) → 실무자 앱(Use this template)**을 따릅니다. 고객사는 표준 저장소에 인프라와 업무 표준을 적용·검증하고, 실무자는 그 template에서 앱을 생성해 개인화합니다. 고객사가 한 표준 저장소 안에서 여러 앱 모듈을 관리하는 기존 방식도 사용할 수 있습니다.
 
 | 계층 | 관리할 내용 | 업데이트 기준 |
 | --- | --- | --- |
 | Core | 공통 HTTP·인증·MCP 연결·UI 유틸리티 | 공통 코드의 변경 이력 |
-| 고객사 fork / template | SSO·proxy·network·배포·기본 업무 모듈 | Core와의 공통 Git 조상 |
+| 고객사 표준 / template | SSO·proxy·network·배포·기본 업무 모듈 | Core와의 공통 Git 조상 |
 | 실무자 앱 | 업무 흐름·검색 기본값·표시 열·레이아웃 | 마지막 적용 고객사 template 버전 |
 
 전체 절차와 명령은 [고객사 template 운영 안내](docs/customer-template.md)를 참고하세요.
@@ -33,22 +33,26 @@ npm start
 - `public/app.js`, `public/index.html`, `public/style.css`: 업무별 화면의 시작점.
 - `test/`: core 독립 동작·권한 거부·이전 응답 무효화·starter 검사.
 
-고객사 인프라 설정과 개인화 UI는 업무 모듈/설정으로 확장합니다. 공통 수정은 가능한 core에 반영합니다. 고객사 fork는 업데이트 branch에서 core 변경을 merge하고, 실무자 앱은 기록된 template 기준으로 변경을 적용합니다. GitHub Template 생성은 새 초기 commit으로 시작하므로 fork와 같은 Git 이력을 공유한다고 가정하지 않습니다.
+고객사 인프라 설정과 개인화 UI는 업무 모듈/설정으로 확장합니다. 공통 수정은 가능한 core에 반영합니다. 고객사 표준은 업데이트 branch에서 core 변경을 merge하고, 실무자 앱은 기록된 template 기준으로 변경을 적용합니다. GitHub Template 생성은 새 초기 commit으로 시작하므로 fork와 같은 Git 이력을 공유한다고 가정하지 않습니다.
 
-## 고객사 fork에서 시작하기
+## 고객사 private 표준에서 시작하기
 
-GitHub에서 이 저장소를 고객사가 승인한 위치로 fork합니다. private fork 허용 여부와 대상은 조직 정책을 따릅니다. clone한 저장소에서 origin은 고객 fork, upstream은 갱신을 받을 저장소인지 확인합니다.
+고객사 코드가 private이어야 하면 core의 Git 이력을 보존한 **private 독립 저장소**를 준비합니다. `origin`은 고객사 저장소, `upstream`은 core로 둡니다. 기존 remote를 덮어쓰지 말고 출처를 확인합니다.
 
 ```sh
 git remote -v
 git remote add upstream https://github.com/HighValueConsulting/hierp-apps-core.git
+git fetch upstream main
+git merge-base HEAD upstream/main
 ```
 
-이미 upstream이 있다면 덮어쓰지 말고 관계를 확인합니다. 고객사 fork에 인프라·업무 표준을 적용하고 검증한 뒤 GitHub Settings에서 Template repository로 지정합니다. 실무자 앱은 이 고객사 template의 `Use this template`으로 생성합니다. Core에서 직접 생성하여 고객사 구성을 건너뛰지 않습니다.
+위 `remote add`는 upstream이 없는 경우에만 사용합니다. 공통 조상과 고객사 인프라·업무 표준을 검증한 뒤 고객 저장소를 **Template repository**로 지정합니다. 실무자 앱은 이 고객사 template의 `Use this template`으로 생성합니다. 고객 표준 자체를 파일 복사나 template 생성으로 초기화하면 core와의 공통 조상을 잃으므로 두 단계를 구분합니다.
 
-Fork의 공개 범위는 원본과 GitHub 정책의 영향을 받습니다. 고객사 코드의 공개 범위가 요구와 맞는지 확인한 뒤 생성하세요. 자세한 조건은 [운영 안내](docs/customer-template.md#고객사-표준-준비)에 있습니다.
+Public core의 GitHub fork는 단독 private 전환이 불가능합니다. 기존 fork는 필요하면 fork network를 분리한 뒤 private으로 전환하고 Template 설정을 재확인합니다. 분리의 영향과 새 저장소 준비 절차는 [고객사 template 운영 안내](docs/customer-template.md#고객사-표준-준비)에 있습니다. 공개 범위가 적합한 기존 GitHub fork도 지원합니다.
 
-`hierp-apps` v0.2.0 이상의 `build-app`과 `resolve-core-update` skill이 두 경로를 지원합니다. Plugin은 별도 배포되며 core에 helper를 복제하거나 npm dependency로 추가하지 않습니다. Core와 plugin의 버전 번호를 일치시킬 필요는 없습니다.
+Core 업데이트에는 GitHub fork 표시가 필요하지 않습니다. 공통 조상을 바탕으로 별도 branch/worktree에서 검토하고, 고객사 저장소 내부 PR로 반영합니다.
+
+`hierp-apps` v0.2.1 이상의 `build-app`과 `resolve-core-update` skill이 두 경로를 지원합니다. Plugin은 별도 배포되며 core에 helper를 복제하거나 npm dependency로 추가하지 않습니다. Core와 plugin의 버전 번호를 일치시킬 필요는 없습니다.
 
 ## 실무자 앱의 생성·적용 기준
 
