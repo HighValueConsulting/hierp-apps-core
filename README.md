@@ -2,7 +2,15 @@
 
 SAP를 SSoT로 사용하는 개인화 조회 앱의 공통 upstream입니다. 공통 HTTP·인증·MCP 연결과 UI 유틸리티, 최소 실행 가능한 빈 업무 모듈을 제공합니다.
 
-이 저장소를 고객사 인프라에 맞게 fork하고, 해당 fork에서 실무자의 업무·화면을 구현합니다. 변경 전달은 **core → 고객사 fork → 개인화 앱**을 따릅니다. 고객사가 여러 앱 모듈을 한 fork에서 관리해도 됩니다.
+변경 전달은 **core repository → 고객사 fork(Template 지정) → 실무자 앱(Use this template)**을 따릅니다. 고객사는 fork에 인프라와 업무 표준을 적용·검증하고, 실무자는 그 template에서 앱을 생성해 개인화합니다. 고객사가 한 fork 안에서 여러 앱 모듈을 관리하는 기존 방식도 사용할 수 있습니다.
+
+| 계층 | 관리할 내용 | 업데이트 기준 |
+| --- | --- | --- |
+| Core | 공통 HTTP·인증·MCP 연결·UI 유틸리티 | 공통 코드의 변경 이력 |
+| 고객사 fork / template | SSO·proxy·network·배포·기본 업무 모듈 | Core와의 공통 Git 조상 |
+| 실무자 앱 | 업무 흐름·검색 기본값·표시 열·레이아웃 | 마지막 적용 고객사 template 버전 |
+
+전체 절차와 명령은 [고객사 template 운영 안내](docs/customer-template.md)를 참고하세요.
 
 ## 로컬 실행
 
@@ -25,7 +33,7 @@ npm start
 - `public/app.js`, `public/index.html`, `public/style.css`: 업무별 화면의 시작점.
 - `test/`: core 독립 동작·권한 거부·이전 응답 무효화·starter 검사.
 
-고객사 인프라 설정과 개인화 UI는 업무 모듈/설정으로 확장합니다. 공통 수정은 가능한 core에 반영하고, 각 fork에서 업데이트 branch를 만들어 관련 검증 후 병합합니다. 초기 앱을 만들기 위해 Git 이력을 없애거나 파일을 새로 복사할 필요가 없습니다.
+고객사 인프라 설정과 개인화 UI는 업무 모듈/설정으로 확장합니다. 공통 수정은 가능한 core에 반영합니다. 고객사 fork는 업데이트 branch에서 core 변경을 merge하고, 실무자 앱은 기록된 template 기준으로 변경을 적용합니다. GitHub Template 생성은 새 초기 commit으로 시작하므로 fork와 같은 Git 이력을 공유한다고 가정하지 않습니다.
 
 ## 고객사 fork에서 시작하기
 
@@ -36,9 +44,24 @@ git remote -v
 git remote add upstream https://github.com/HighValueConsulting/hierp-apps-core.git
 ```
 
-이미 upstream이 있다면 덮어쓰지 말고 관계를 확인합니다. 고객사 fork에서 파생한 개인화 앱은 보통 해당 고객사 fork를 upstream으로 사용하여 고객 인프라 적응을 보존합니다.
+이미 upstream이 있다면 덮어쓰지 말고 관계를 확인합니다. 고객사 fork에 인프라·업무 표준을 적용하고 검증한 뒤 GitHub Settings에서 Template repository로 지정합니다. 실무자 앱은 이 고객사 template의 `Use this template`으로 생성합니다. Core에서 직접 생성하여 고객사 구성을 건너뛰지 않습니다.
 
-`hierp-apps` 개발 플러그인의 `build-app`과 `resolve-core-update` skill을 사용할 수 있습니다. Plugin은 별도 배포되며 이 core 저장소에 credentials나 plugin 설치 상태를 포함하지 않습니다.
+Fork의 공개 범위는 원본과 GitHub 정책의 영향을 받습니다. 고객사 코드의 공개 범위가 요구와 맞는지 확인한 뒤 생성하세요. 자세한 조건은 [운영 안내](docs/customer-template.md#고객사-표준-준비)에 있습니다.
+
+`hierp-apps` v0.2.0 이상의 `build-app`과 `resolve-core-update` skill이 두 경로를 지원합니다. Plugin은 별도 배포되며 core에 helper를 복제하거나 npm dependency로 추가하지 않습니다. Core와 plugin의 버전 번호를 일치시킬 필요는 없습니다.
+
+## 실무자 앱의 생성·적용 기준
+
+앱 생성 직후 plugin의 `template-update.mjs bind`가 초기 앱 tree와 생성 당시 고객사 template tree의 일치를 확인하고 `.hierp-apps/template.json`을 기록합니다. 이 파일을 앱에 commit한 뒤 개인화합니다.
+
+- `templateRepository`: 확인한 고객사 template 저장소
+- `generatedCommit`: 앱의 초기 생성 commit
+- `initialTemplateCommit`: 생성 당시 고객사 template commit
+- `appliedTemplateCommit`: 마지막으로 적용한 고객사 template commit
+
+**이 파일은 실무자 앱 전용입니다. Core와 고객사 template에 미리 넣지 않습니다.** 실무자 앱에서는 Git에 추적하며, `.env`·secret·SAP 원본 증거와 구분합니다. 현재 `.gitignore`는 provenance를 제외하지 않습니다.
+
+업데이트는 이전 template·현재 앱·새 template의 세 버전을 비교합니다. 충돌 해결과 관련 검증을 마친 후보에서만 `finalize`로 적용 기준을 stage하고, 코드와 provenance를 같은 commit에 담습니다. 초기 생성 정보는 유지하며, 다음 업데이트는 마지막 적용 버전에서 시작합니다. [명령과 실패 처리](docs/customer-template.md#실무자-앱-업데이트)를 참고하세요.
 
 ## 업무 계약 구현
 
