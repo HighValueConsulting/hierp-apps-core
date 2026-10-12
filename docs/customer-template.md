@@ -4,13 +4,13 @@
 
 ```text
 hierp-apps-core
-  └─ GitHub fork → 고객사 표준 저장소 (Template repository)
+  └─ Git 이력 보존 → 고객사 private 독립 저장소 (Template repository)
                       └─ Use this template → 실무자 개인화 앱
 ```
 
-고객사 표준은 core와 Git 이력을 공유합니다. 실무자 앱은 고객사 template의 파일에서 새 초기 commit으로 시작하므로 두 업데이트 경로를 구분합니다. 고객사가 하나의 fork 안에서 여러 앱 모듈을 운영한다면 그 앱에는 fork 경로를 사용할 수 있습니다.
+고객사 표준은 GitHub fork network와 독립적으로 운영하며 core와 공통 Git 이력을 유지합니다. 실무자 앱은 고객사 template의 파일에서 새 초기 commit으로 시작하므로 두 업데이트 경로를 구분합니다. 고객사가 하나의 표준 저장소 안에서 여러 앱 모듈을 운영한다면 그 앱에는 공통 조상 merge 경로를 사용할 수 있습니다. 공개 범위가 적합한 기존 GitHub fork도 같은 경로를 사용합니다.
 
-`hierp-apps` v0.2.0 이상과 Node 26, helper가 요구하는 Git 기능을 준비합니다. 이 문서의 `PLUGIN_ROOT`는 설치된 plugin 패키지의 실제 경로입니다. 설치 host의 plugin 정보에서 확인하고, 아래 설명용 값을 실제 경로로 바꿉니다. Core repository에는 helper가 들어 있지 않습니다.
+`hierp-apps` v0.2.1 이상과 Node 26, helper가 요구하는 Git 기능을 준비합니다. 이 문서의 `PLUGIN_ROOT`는 설치된 plugin 패키지의 실제 경로입니다. 설치 host의 plugin 정보에서 확인하고, 아래 설명용 값을 실제 경로로 바꿉니다. Core repository에는 helper가 들어 있지 않습니다.
 
 ```sh
 PLUGIN_ROOT="/path/to/installed/hierp-apps"
@@ -22,28 +22,44 @@ Helper는 fetch·원격 생성·commit·push·배포를 자동 수행하지 않�
 
 ## 고객사 표준 준비
 
-1. Core와 고객사 저장소의 접근 권한·visibility·fork 정책을 확인합니다. Public repository의 GitHub fork는 public이며 fork만 private으로 바꿀 수 없습니다. 고객사 코드가 비공개여야 한다면 public fork에 코드를 올리기 전에 승인된 private upstream 등 적합한 저장소 구성을 결정합니다. 이 안내가 조직 정책 변경을 허가하는 것은 아닙니다.
-2. 고객사가 승인한 위치로 core를 fork하고 clone합니다. `origin`은 고객 fork, `upstream`은 core인지 확인합니다. 기존 remote가 있으면 덮어쓰지 않습니다.
+1. Core와 고객사 저장소의 접근 권한·visibility·조직 정책을 확인합니다. 고객사 코드가 비공개여야 하면 공통 Git 이력을 보존한 private 독립 저장소를 기본으로 준비합니다. Public core의 GitHub fork는 그 network 안에서 단독 private 전환할 수 없습니다.
+2. 사용자에게 확인된 owner/name으로 **빈 private 저장소**를 만들고 core를 clone하여 Git 이력을 보존한 초기 branch를 push합니다. 원격을 `origin`=고객 저장소, `upstream`=core로 설정합니다. README를 자동 생성한 별도 root, 파일 복사·Git 재초기화, core의 Use this template으로 공통 조상을 대체하지 않습니다.
 3. 고객사 SSO·proxy·network·배포·secret 참조와 기본 업무 모듈을 구현합니다. 실제 credential과 SAP 원본 데이터는 저장소에 넣지 않습니다.
 4. 관련 테스트 및 고객사 인증·실제 SAP·브라우저 흐름을 검증합니다. 단위 테스트와 실제 환경 검증 결과를 구분합니다.
-5. 고객사 저장소를 GitHub Settings의 **Template repository**로 지정합니다. 새 실무자 앱에 제공할 검증된 default branch를 유지합니다. `.hierp-apps/template.json`은 포함하지 않습니다.
+5. 고객사 저장소를 GitHub Settings의 **Template repository**로 지정합니다. 실제 metadata의 `visibility: private`, `fork: false`, `is_template: true`와 default branch·접근 권한을 확인합니다. 새 실무자 앱에 제공할 검증된 default branch를 유지하고 `.hierp-apps/template.json`은 포함하지 않습니다.
 
-Fork visibility와 권한은 [GitHub fork 규칙](https://docs.github.com/en/pull-requests/reference/forks)을 따릅니다. Template 생성 시 전달되는 파일·이력은 [GitHub template 생성 설명](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)을 참고하세요.
+초기화 예시는 아래와 같습니다. `CORE_URL`, `CUSTOMER_URL`, `CORE_BRANCH`는 확인한 실제 값으로 바꾸며, 목적지는 앞에서 만든 빈 private 저장소여야 합니다. 기존 저장소를 덮어쓰는 명령으로 사용하지 않습니다.
+
+```sh
+git clone --origin upstream --branch CORE_BRANCH --single-branch CORE_URL /path/to/new-customer-standard
+git -C /path/to/new-customer-standard remote add origin CUSTOMER_URL
+git -C /path/to/new-customer-standard push -u origin HEAD
+```
+
+기본 branch 이름이 core와 다르면 초기 push와 고객 default branch를 조직 정책에 맞게 지정합니다. Clone과 초기 push는 commit 이력을 보존하며 GitHub fork 관계를 만들지 않습니다. [GitHub 저장소 복제 안내](https://docs.github.com/en/repositories/creating-and-managing-repositories/duplicating-a-repository)
+
+### 이미 public fork를 만든 경우
+
+사용자 요청 범위에서 **Leave fork network → private 전환 → Template 설정 재확인**을 수행할 수 있습니다. Git commit 이력은 보존되지만 분리는 영구적이며 Issues·PR·Wiki 등 GitHub metadata는 보존되지 않습니다. 실행 전에 해당 저장소의 실제 영향을 확인합니다. 검증 요청만으로 분리·visibility 변경·삭제·재생성을 실행하지 않습니다. Core를 private으로 바꾸더라도 기존 public fork가 함께 private이 되지는 않습니다. [Fork 분리 안내](https://docs.github.com/en/pull-requests/how-tos/work-with-forks/detaching-a-fork), [fork 공개 범위 규칙](https://docs.github.com/en/pull-requests/reference/forks)
+
+분리 후 `fork: false`나 parent 정보의 부재는 업데이트 실패 조건이 아닙니다. Git 이력과 `upstream` remote가 core 관계를 유지합니다. 고객사 Template 설정은 별도 기능이며 분리 후 실제 값을 다시 확인합니다. 실무자 생성 시 전달되는 파일과 독립 이력은 [GitHub template 생성 설명](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)을 따릅니다.
 
 ## Core에서 고객사 표준 업데이트
 
-확인된 core remote에서 원하는 ref를 fetch합니다. Git 변경·진행 중 작업을 확인한 후 새 branch/worktree를 지정합니다. 다음 경로와 ref는 설명용이며 실제 값으로 바꿉니다.
+확인된 core remote에서 원하는 ref를 fetch하고 `git merge-base HEAD <core-local-ref>`로 공통 조상을 확인합니다. Shallow clone이나 누락된 ref면 확인된 remote에서 필요한 이력을 확보합니다. 공통 조상이 없다고 unrelated-history merge로 우회하지 않습니다. Git 변경·진행 중 작업을 확인한 후 새 branch/worktree를 지정합니다. 다음 경로와 ref는 설명용이며 실제 값으로 바꿉니다.
 
 ```sh
 node "$PLUGIN_ROOT/scripts/core-update.mjs" inspect \
-  --repo /path/to/customer-fork --upstream refs/remotes/upstream/main
+  --repo /path/to/customer-standard --upstream refs/remotes/upstream/main
 
 node "$PLUGIN_ROOT/scripts/core-update.mjs" prepare \
-  --repo /path/to/customer-fork --upstream refs/remotes/upstream/main \
+  --repo /path/to/customer-standard --upstream refs/remotes/upstream/main \
   --branch review/core-update --worktree /path/to/new-core-review
 ```
 
-Base·고객 코드·새 core의 의도를 비교합니다. 고객 경로나 개인화 코드를 일괄 `ours`로 선택하지 않고, 새 보안·데이터 계약도 함께 적용합니다. 검사한 후보를 고객사 절차에 따라 commit·PR·병합하고 실제 배포를 검증합니다. 고객 표준이 검증된 후 그 버전을 실무자 앱의 업데이트 대상으로 제공합니다.
+Base·고객 코드·새 core의 의도를 비교합니다. 고객 경로나 개인화 코드를 일괄 `ours`로 선택하지 않고, 새 보안·데이터 계약도 함께 적용합니다. 검사한 후보를 고객 저장소의 새 branch에 push하고 **고객 저장소 내부 PR**로 반영한 뒤 실제 배포를 검증합니다. GitHub fork 전용 Sync fork UI는 필요하지 않습니다. 초기 복제 이후 mirror-push로 고객 변경을 덮어쓰지 않습니다. 고객 표준이 검증된 후 그 버전을 실무자 앱의 업데이트 대상으로 제공합니다.
+
+Core와 고객 tip이 같으면 최신 상태를 확인한 것입니다. 실제 새 변경의 적용 검증과 구분하며, `inspect` 성공만으로 고객 배포·SAP·SSO 검증이 끝났다고 보고하지 않습니다.
 
 ## 실무자 앱 생성과 기준 기록
 
